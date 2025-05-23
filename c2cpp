@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+import os
+import re
+import argparse
+import sys
+
+def update_cpp_from_c(c_file_path, cpp_file_path):
+    # 1) Read both files
+    with open(c_file_path, 'r', newline='') as f:
+        c_lines = f.readlines()
+    with open(cpp_file_path, 'r', newline='') as f:
+        cpp_lines = f.readlines()
+
+    # 2) Extract all USER CODE blocks from existing main.cpp
+    begin_re = re.compile(r'/\*\s*USER CODE BEGIN\s+(\w+)\s*\*/')
+    end_re   = re.compile(r'/\*\s*USER CODE END\s+(\w+)\s*\*/')
+
+    user_blocks = {}
+    in_block    = False
+    block_id    = None
+    buffer      = []
+
+    for line in cpp_lines:
+        m_b = begin_re.search(line)
+        if m_b:
+            in_block = True
+            block_id = m_b.group(1)
+            buffer   = []
+            continue
+
+        m_e = end_re.search(line)
+        if m_e and in_block and m_e.group(1) == block_id:
+            user_blocks[block_id] = buffer.copy()
+            in_block = False
+            block_id = None
+            continue
+
+        if in_block:
+            buffer.append(line)
+
+    # 3) Merge
+    output = []
+    in_block = False
+    block_id = None
+
+    for line in c_lines:
+        m_b = begin_re.search(line)
+        if m_b:
+            in_block = True
+            block_id = m_b.group(1)
+            output.append(line)
+            output.extend(user_blocks.get(block_id, []))
+            continue
+
+        m_e = end_re.search(line)
+        if m_e and in_block and m_e.group(1) == block_id:
+            output.append(line)
+            in_block = False
+            block_id = None
+            continue
+
+        if not in_block:
+            output.append(line)
+
+    # 4) Write it all back to main.cpp
+    with open(cpp_file_path, 'w', newline='') as f:
+        f.writelines(output)
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Update main.cpp from main.c skeleton, preserving USER CODE blocks'
+    )
+    parser.add_argument('directory',
+        help='Path to the folder containing main.c and main.cpp'
+    )
+    parser.add_argument('--c-file', default='main.c',
+        help='Name of the C skeleton file (default: main.c)'
+    )
+    parser.add_argument('--cpp-file', default='main.cpp',
+        help='Name of the C++ target file (default: main.cpp)'
+    )
+    args = parser.parse_args()
+
+    c_path   = os.path.join(args.directory, args.c_file)
+    cpp_path = os.path.join(args.directory, args.cpp_file)
+
+    if not os.path.isfile(c_path):
+        print(f'Error: file not found: {c_path}', file=sys.stderr)
+        sys.exit(1)
+    if not os.path.isfile(cpp_path):
+        print(f'Error: file not found: {cpp_path}', file=sys.stderr)
+        sys.exit(1)
+
+    update_cpp_from_c(c_path, cpp_path)
+    print(f'Updated {cpp_path} based on {c_path}')
+
+if __name__ == '__main__':
+    main()
