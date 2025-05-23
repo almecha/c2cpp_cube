@@ -1,10 +1,7 @@
 # c2cpp_cube
 Small tool to synchronize main.c and main.cpp after code generation by stm32cubemx
 ## Installation
-1. Download the script into a file named `c2cpp`:
-   ```bash
-    curl -Lo c2cpp https://your.repo.url/path/to/c2cpp
-    ```
+1. Download the c2cpp script 
 2. Make executable:
     ```bash
     chmod +x c2cpp
